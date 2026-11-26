@@ -1,0 +1,22 @@
+{
+  "enabled": true,
+  "bootStart": false,
+  "displayWidth": 0,
+  "displayHeight": 0,
+  "displayDensity": 0,
+  "fallbackWidth": 800,
+  "fallbackHeight": 480,
+  "videoBitrate": 8000000,
+  "videoFps": 30,
+  "mediaAudio": true,
+  "microphone": true,
+  "carGps": true,
+  "carAppearance": true,
+  "reconnectInitialMs": 1000,
+  "reconnectMaxMs": 30000,
+  "controlPort": 49152,
+  "logLevel": 1,
+  "logFileBytes": 8388608,
+  "logRetentionDays": 7,
+  "logTotalBytes": 268435456
+}

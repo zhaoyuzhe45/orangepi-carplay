@@ -1,0 +1,110 @@
+--- //wsl.localhost/Ubuntu-20.04/home/orangepi/rk3399/RK3399-Android8.1/kernel/drivers/usb/gadget/composite.c.orig	2021-07-20 21:11:40.000000000 +0800
++++ composite-box-2026-10-28.c	2026-10-28 13:20:03.795254300 +0800
+@@ -1452,6 +1452,49 @@
+ }
+ 
+ /*
++ * box: Apple vendor probes.
++ *
++ * A head unit opens the conversation with vendor requests, long before iAP2.
++ * They are addressed either to the device (wIndex 0) or to an interface index
++ * that means nothing to FunctionFS, so composite used to find no owner and
++ * stalled them; the car then went silent and never sent a single iAP2 message.
++ *
++ * Only the two static identity probes are answered here.  Requests that change
++ * state (0x52 configuration switch, 0x51 role swap) are left to whichever
++ * function claims them through req_match, because user space is the only place
++ * that knows whether such a switch is allowed right now.
++ */
++static int box_vendor_probe(const struct usb_ctrlrequest *ctrl, void *buf,
++			    u16 w_length)
++{
++	u8 *out = buf;
++
++	if (ctrl->bRequestType != 0xc0)
++		return -EOPNOTSUPP;
++
++	switch (ctrl->bRequest) {
++	case 0x53:	/* CarPlay support: 0x00000001 means "yes" */
++		if (w_length < 4)
++			return -EOPNOTSUPP;
++		out[0] = 0x01;
++		out[1] = 0x00;
++		out[2] = 0x00;
++		out[3] = 0x00;
++		return 4;
++	case 0x45:	/* usbmuxd GET_USB_MODE: 3:3:3:0 is the unswitched mode */
++		if (w_length < 4)
++			return -EOPNOTSUPP;
++		out[0] = 0x03;
++		out[1] = 0x03;
++		out[2] = 0x03;
++		out[3] = 0x00;
++		return 4;
++	}
++
++	return -EOPNOTSUPP;
++}
++
++/*
+  * The setup() callback implements all the ep0 functionality that's
+  * not handled lower down, in hardware or the hardware driver(like
+  * device and endpoint feature flags, and their status).  It's all
+@@ -1483,6 +1526,40 @@
+ 	gadget->ep0->driver_data = cdev;
+ 
+ 	/*
++	 * box: vendor requests carry CarPlay's opening handshake.  Log every one
++	 * of them (this layer used to answer them invisibly, which is why the
++	 * daemon never saw an ep0 SETUP), let a function claim them, and fall
++	 * back to the static identity probes so the PTP-only standby
++	 * configuration -- which links no f_fs at all -- can still answer 0x53.
++	 */
++	if ((ctrl->bRequestType & USB_TYPE_MASK) == USB_TYPE_VENDOR) {
++		INFO(cdev, "box: vendor req %02x.%02x v%04x i%04x l%d\n",
++		     ctrl->bRequestType, ctrl->bRequest,
++		     w_value, w_index, w_length);
++
++		if (cdev->config) {
++			list_for_each_entry(f, &cdev->config->functions, list)
++				if (f->req_match && f->req_match(f, ctrl))
++					goto try_fun_setup;
++			f = NULL;
++		}
++
++		value = box_vendor_probe(ctrl, req->buf, w_length);
++		if (value < 0)
++			goto unknown;
++
++		req->length = value;
++		req->zero = value < w_length;
++		value = composite_ep0_queue(cdev, req, GFP_ATOMIC);
++		if (value < 0) {
++			DBG(cdev, "ep_queue --> %d\n", value);
++			req->status = 0;
++			composite_setup_complete(gadget->ep0, req);
++		}
++		return value;
++	}
++
++	/*
+ 	 * Don't let non-standard requests match any of the cases below
+ 	 * by accident.
+ 	 */
+@@ -1507,7 +1584,15 @@
+ 					cdev->desc.bcdUSB = cpu_to_le16(0x0300);
+ 					cdev->desc.bMaxPacketSize0 = 9;
+ 				} else {
+-					cdev->desc.bcdUSB = cpu_to_le16(0x0210);
++					/* box: do not force 0x0210 at high speed.
++					 * 0x0210 tells the host to read a BOS descriptor, and Windows
++					 * then fetched the Rockchip MS OS
++					 * compatible ID ("RESTORE_MODE"), enumerating this box as an
++					 * Android ADB device -- five nodes, three with a yellow bang.
++					 * A real iPhone reports 0x0200 and offers no BOS, so keep the
++					 * value configfs configured. */
++					if (cdev->desc.bcdUSB > cpu_to_le16(0x0200))
++						cdev->desc.bcdUSB = cpu_to_le16(0x0200);
+ 				}
+ 			} else {
+ 				cdev->desc.bcdUSB = cpu_to_le16(0x0200);

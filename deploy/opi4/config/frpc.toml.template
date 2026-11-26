@@ -1,0 +1,27 @@
+# frpc 配置模板（frp 0.71.x，TOML 格式）
+#
+# 用法：把 __FRP_*__ 占位符换成真实值，复制到设备 /data/carplay/frpc.toml。
+# 启动脚本发现占位符还在时会一直待机，不会反复重连刷日志。
+# 文件权限保持 0600 root:root —— 里面是接入凭证。
+
+serverAddr = "__FRP_SERVER_ADDR__"
+serverPort = __FRP_SERVER_PORT__
+
+auth.method = "token"
+auth.token = "__FRP_TOKEN__"
+
+# 首次连不上时留在前台重试，而不是直接退出（开机时 WiFi 可能还没就绪）。
+loginFailExit = false
+
+log.to = "/data/carplay/logs/frpc-client.log"
+log.level = "info"
+log.maxDays = 7
+
+# 把设备上的 adbd（service.adb.tcp.port=5555）映射到 frps 上的一个端口。
+# 远程调试：adb connect <serverAddr>:<remotePort>
+[[proxies]]
+name = "opi4-adb"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 5555
+remotePort = __FRP_REMOTE_PORT__

@@ -1,0 +1,6 @@
+<resources>
+    <bool name="profile_supported_hfpclient">true</bool>
+    <bool name="profile_supported_pbapclient">true</bool>
+    <!-- Legacy hint; Android 8.1 does not enforce this resource for HFP routing. -->
+    <bool name="headset_client_initial_audio_route_allowed">false</bool>
+</resources>

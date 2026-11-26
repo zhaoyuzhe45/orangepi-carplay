@@ -1,0 +1,50 @@
+# Generated C and Java intermediates
+# /build/ 同时保存构建输出、依赖、现场证据和回滚材料；忽略不代表可删除。
+# 纳入版本管理前先安排证据/备份的独立保管，见 build/README.md。
+/build/
+/tests/build/
+**/*.o
+**/*.obj
+**/*.class
+**/*.dex
+**/*.pyc
+**/__pycache__/
+
+# Local output and diagnostics
+*.log
+!/docs/evidence/*.log
+*.bak
+*.tmp
+*.swp
+.vscode/
+.idea/
+
+# Local identity and credentials. Keep documentation, never actual identities.
+/config/**
+!/config/**/
+!/config/**/README.md
+!/config/**/*.example
+/src/lockdown_identity.h
+/src/lockdown_tls_identity.h
+*.keystore
+*.password
+*.pk8
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+
+# Locally built packages and third-party binaries are not source releases.
+/deploy/opi4/bin/
+/deploy/opi4/apk/*.apk
+/deploy/opi4/apk/*.idsig
+/deploy/opi4/SHA256SUMS
+/tests/fixtures/*.apk
+/tools/scrcpy/
+*.so
+*.dll
+*.exe
+
+# Personal vehicle branding is optional, never part of the public defaults.
+/tools/render-audi-placeholder.py

@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.carplaybox.appfixture">
+ <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="27" />
+ <application android:label="CarPlay test fixture">
+  <service android:name=".AppMediaFixture" android:exported="true" />
+  <activity android:name=".AppVoiceFixture" android:exported="true">
+   <intent-filter><action android:name="android.intent.action.VOICE_COMMAND"/><category android:name="android.intent.category.DEFAULT"/></intent-filter>
+  </activity>
+ </application>
+</manifest>

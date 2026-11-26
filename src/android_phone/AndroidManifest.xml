@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.carplaybox.phone" android:versionCode="1" android:versionName="1.0">
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="27" />
+    <uses-permission android:name="com.carplaybox.audio.permission.PHONE_BRIDGE" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <application android:allowBackup="false" android:label="电话" android:icon="@drawable/phone_icon" android:theme="@android:style/Theme.Material.NoActionBar">
+        <activity android:name="com.carplaybox.audio.PhoneActivity" android:exported="true" android:launchMode="singleTask" android:screenOrientation="sensorLandscape">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity>
+        <activity android:name="com.carplaybox.audio.IncomingCallActivity" android:exported="true" android:permission="com.carplaybox.audio.permission.PHONE_BRIDGE"
+            android:theme="@android:style/Theme.Material.Dialog.NoActionBar" android:taskAffinity="com.carplaybox.phone.incoming"
+            android:launchMode="singleTask" android:excludeFromRecents="true" android:screenOrientation="sensorLandscape" />
+    </application>
+</manifest>

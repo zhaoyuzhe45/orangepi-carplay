@@ -1,0 +1,4 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.carplaybox.navfixture">
+ <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="27" />
+ <application android:label="Navigation PCM test"><service android:name="com.carplaybox.fixture.AudioToneFixture" android:exported="true" /></application>
+</manifest>

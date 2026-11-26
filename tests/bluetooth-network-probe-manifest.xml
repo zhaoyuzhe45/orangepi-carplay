@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.carplaybox.bluetoothnetworkprobe">
+    <uses-sdk android:minSdkVersion="27" android:targetSdkVersion="27" />
+    <application android:label="Bluetooth network verification" />
+    <instrumentation android:name="com.carplaybox.audio.BluetoothNetworkDeviceTest" android:targetPackage="com.carplaybox.audio" />
+</manifest>

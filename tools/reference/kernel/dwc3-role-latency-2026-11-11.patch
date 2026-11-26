@@ -1,0 +1,115 @@
+--- a/drivers/usb/dwc3/gadget.c
++++ b/drivers/usb/dwc3/gadget.c
+@@ -1865,6 +1865,28 @@
+ 	spin_unlock_irqrestore(&dwc->lock, flags);
+ 
+ 	free_irq(dwc->irq_gadget, dwc->ev_buf);
++
++	/*
++	 * Software unbind need not produce a disconnect event. All function
++	 * requests have been returned by unbind, and free_irq() above drains
++	 * any final reset/disconnect event before we repair the link state.
++	 * Otherwise Rockchip's role work can wait a full second for a flag
++	 * whose only event source has just been disabled.
++	 *
++	 * Never clear it merely because pullup(false) was requested: that
++	 * operation can time out. Require the controller to be stopped, or
++	 * already runtime suspended, before declaring it disconnected.
++	 */
++	spin_lock_irqsave(&dwc->lock, flags);
++	if (pm_runtime_suspended(dwc->dev) ||
++	    (!dwc->pullups_connected &&
++	     !(dwc3_readl(dwc->regs, DWC3_DCTL) & DWC3_DCTL_RUN_STOP) &&
++	     (dwc3_readl(dwc->regs, DWC3_DSTS) & DWC3_DSTS_DEVCTRLHLT))) {
++		if (dwc->connected)
++			dev_info(dwc->dev, "UDC stop: cleared stale connected after controller halt\n");
++		dwc->connected = false;
++	}
++	spin_unlock_irqrestore(&dwc->lock, flags);
+ 
+ 	return 0;
+ }
+--- a/drivers/usb/dwc3/dwc3-rockchip.c
++++ b/drivers/usb/dwc3/dwc3-rockchip.c
+@@ -30,6 +30,7 @@
+ #include <linux/extcon.h>
+ #include <linux/freezer.h>
+ #include <linux/iopoll.h>
++#include <linux/ktime.h>
+ #include <linux/reset.h>
+ #include <linux/usb.h>
+ #include <linux/usb/hcd.h>
+@@ -95,6 +96,7 @@
+ 	struct dwc3_rockchip	*rockchip = dev_get_drvdata(device);
+ 	struct dwc3		*dwc = rockchip->dwc;
+ 	enum usb_dr_mode	new_dr_mode;
++	ktime_t			started;
+ 
+ 	if (!rockchip->original_dr_mode)
+ 		rockchip->original_dr_mode = dwc->dr_mode;
+@@ -120,6 +122,12 @@
+ 		return count;
+ 	}
+ 
++	started = ktime_get();
++	dev_info(rockchip->dev,
++		 "role timing: begin %u->%u usage=%d connected=%u bound=%u\n",
++		 dwc->dr_mode, new_dr_mode,
++		 atomic_read(&dwc->dev->power.usage_count), dwc->connected,
++		 !!dwc->gadget_driver);
+ 	rockchip->force_mode = true;
+ 
+ 	/*
+@@ -136,10 +144,19 @@
+ 	schedule_work(&rockchip->otg_work);
+ 	flush_work(&rockchip->otg_work);
+ 
++	dev_info(rockchip->dev,
++		 "role timing: disconnected +%lld us skip_suspend=%u usage=%d\n",
++		 (long long)ktime_us_delta(ktime_get(), started),
++		 rockchip->skip_suspend,
++		 atomic_read(&dwc->dev->power.usage_count));
++
+ 	/* Schedule the otg work to set the otg to new mode. */
+ 	dwc->dr_mode = new_dr_mode;
+ 	schedule_work(&rockchip->otg_work);
+ 	flush_work(&rockchip->otg_work);
++
++	dev_info(rockchip->dev, "role timing: role work complete +%lld us\n",
++		 (long long)ktime_us_delta(ktime_get(), started));
+ 
+ 	/* Set phy mode */
+ 	if (dwc->dr_mode == USB_DR_MODE_PERIPHERAL)
+@@ -147,6 +164,9 @@
+ 	else if (dwc->dr_mode == USB_DR_MODE_HOST)
+ 		phy_set_mode(dwc->usb2_generic_phy, PHY_MODE_USB_HOST);
+ 
++	dev_info(rockchip->dev,
++		 "role timing: mode write complete +%lld us mode=%u\n",
++		 (long long)ktime_us_delta(ktime_get(), started), dwc->dr_mode);
+ 	dev_info(rockchip->dev, "set new mode successfully\n");
+ 	return count;
+ }
+@@ -591,12 +611,22 @@
+ 		}
+ 
+ 		if (DWC3_GCTL_PRTCAP(reg) == DWC3_GCTL_PRTCAP_DEVICE) {
++			ktime_t started = ktime_get();
++
++			dev_info(rockchip->dev,
++				 "role timing: disconnect wait usage=%d connected=%u bound=%u\n",
++				 atomic_read(&dwc->dev->power.usage_count),
++				 dwc->connected, !!dwc->gadget_driver);
+ 			ret = readx_poll_timeout(atomic_read,
+ 						 &dwc->dev->power.usage_count,
+ 						 val,
+ 						 val < 2 && !dwc->connected,
+ 						 1000,
+ 						 PERIPHERAL_DISCONNECT_TIMEOUT);
++			dev_info(rockchip->dev,
++				 "role timing: disconnect wait done %lld us ret=%d usage=%d connected=%u\n",
++				 (long long)ktime_us_delta(ktime_get(), started),
++				 ret, val, dwc->connected);
+ 			if (ret < 0) {
+ 				rockchip->skip_suspend = true;
+ 				dev_warn(rockchip->dev, "Peripheral disconnect timeout\n");

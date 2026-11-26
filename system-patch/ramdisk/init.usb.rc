@@ -1,0 +1,33 @@
+# box: stripped down to the adbd service definition and the /data setup.
+#
+# Two whole families of handlers were deleted:
+#   1. every "on property:sys.usb.config=... && property:sys.usb.configfs=0"
+#      branch -- the legacy /sys/class/android_usb/android0/gadget path, which
+#      is a second, independent way to put adb/mtp/rndis on the bus.  The
+#      stock file set sys.usb.configfs=0 in "on boot"; that line is gone too,
+#      so this path can never be armed again.
+#   2. "on property:sys.usb.config=none && property:sys.usb.configfs=0" which
+#      called "stop adbd".  Stopping adbd here would kill the TCP channel that
+#      is the only way into this box after a flash.
+#
+# The service definition must stay: adbd is class core and "disabled", so only
+# an explicit "start adbd" (in init.rk30board.usb.rc, after functionfs is
+# mounted) brings it up.
+
+on post-fs-data
+    chown system system /sys/class/android_usb/android0/f_mass_storage/lun/file
+    chmod 0660 /sys/class/android_usb/android0/f_mass_storage/lun/file
+    chown system system /sys/class/android_usb/android0/f_rndis/ethaddr
+    chmod 0660 /sys/class/android_usb/android0/f_rndis/ethaddr
+    mkdir /data/misc/adb 02750 system shell
+    mkdir /data/adb 0700 root root
+
+service adbd /system/bin/adbd --root_seclabel=u:r:su:s0
+    class core
+    socket adbd stream 660 system system
+    disabled
+    seclabel u:r:adbd:s0
+
+# adbd on at boot in emulator
+on property:ro.kernel.qemu=1
+    start adbd

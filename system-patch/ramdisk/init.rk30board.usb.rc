@@ -1,0 +1,51 @@
+# box: only the configfs skeleton lives here.
+#
+# Removed on purpose:
+#   * every "on property:sys.usb.config=..." handler -- each one pushed an
+#     Android function (adb/mtp/ptp/rndis/midi/accessory) onto the bus and
+#     rewrote idProduct, which is exactly what made the car head unit treat
+#     this box as a phone.
+#   * os_desc/b_vendor_code + os_desc/qw_sign "MSFT100" + os_desc/b.1 -- those
+#     three are the source of the Rockchip MS OS platform capability in the
+#     BOS descriptor.  With them present Windows appended RESTORE_MODE to the
+#     hardware ID and enumerated the box as an ADB device (five nodes, three
+#     with a yellow bang).
+#   * the mtp/ptp/rndis/midi/accessory/audio_source function bodies.
+#
+# Kept on purpose: ffs.adb plus its functionfs mount.  adbd opens that
+# instance at startup and only then falls back to its TCP socket; dropping it
+# risks losing the remote channel after a flash.  It is created and mounted
+# but never linked into a configuration, so adb never appears on the bus.
+
+on boot
+    mkdir /dev/usb-ffs 0770 shell shell
+    mkdir /dev/usb-ffs/adb 0770 shell shell
+    mount configfs none /config
+    mkdir /config/usb_gadget/g1 0770 shell shell
+    write /config/usb_gadget/g1/idVendor 0x2207
+    write /config/usb_gadget/g1/bcdDevice 0x0310
+    write /config/usb_gadget/g1/bcdUSB 0x0200
+    mkdir /config/usb_gadget/g1/strings/0x409 0770
+    write /config/usb_gadget/g1/strings/0x409/serialnumber ${ro.serialno}
+    write /config/usb_gadget/g1/strings/0x409/manufacturer ${ro.product.manufacturer}
+    write /config/usb_gadget/g1/strings/0x409/product ${ro.product.model}
+    mkdir /config/usb_gadget/g1/configs/b.1 0770 shell shell
+    mkdir /config/usb_gadget/g1/configs/b.1/strings/0x409 0770 shell shell
+    write /config/usb_gadget/g1/configs/b.1/MaxPower 500
+    mkdir /config/usb_gadget/g1/functions/ffs.adb
+    mount functionfs adb /dev/usb-ffs/adb uid=2000,gid=2000
+
+    # "carplay" makes every "configfs=1" branch in init.usb.configfs.rc inert.
+    # The stock value was 1, which armed all of them as soon as userspace
+    # wrote sys.usb.config.
+    setprop sys.usb.configfs carplay
+    setprop sys.usb.controller "fe800000.dwc3"
+
+    # Out-of-band adb.  adbd is "disabled" and class core, so it never starts
+    # on its own; without this line a wiped /data means no way in.
+    # service.adb.tcp.port must be set BEFORE start adbd, otherwise adbd comes
+    # up in USB-only mode and listens on nothing.
+    # /adb_keys is baked into this ramdisk, so ro.adb.secure=1 still lets a
+    # known host connect without touching the screen.
+    setprop service.adb.tcp.port 5555
+    start adbd

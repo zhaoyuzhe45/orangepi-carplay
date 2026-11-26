@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.carplaybox.audiosplitprobe">
+ <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="27" />
+ <application android:label="Audio split verification" />
+ <instrumentation android:name="com.carplaybox.audio.AudioSplitDeviceTest" android:targetPackage="com.carplaybox.audio" />
+ <instrumentation android:name="com.carplaybox.audio.MediaQueueDeviceTest" android:targetPackage="com.carplaybox.audio" />
+</manifest>

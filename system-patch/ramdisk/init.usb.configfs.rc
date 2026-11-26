@@ -1,0 +1,25 @@
+# box: this file used to expose adb, mtp, ptp, rndis, midi, uvc, accessory and
+# audio_source on the USB bus.  All of those are gone.
+#
+# Why: a host that sees an Android function next to the Apple interface
+# classifies the box as an Android device and stops probing for CarPlay.  The
+# mixed layout (ffs.adb + ffs.iap2 in configuration 1) was caught in the
+# 2026-10-25 field log; see docs/evidence/native-iap2-interface-2026-10-25.md.
+#
+# carplay_supervisor.sh owns configuration 1 now.  Nothing in init may touch
+# b.1, because a symlink here and a symlink there race each other.
+#
+# adbd still runs, as a TCP daemon on 5555.  That is the only remote channel
+# besides the UART console, so do not add "stop adbd" anywhere in this file.
+
+on property:sys.usb.config=none && property:sys.usb.configfs=1
+    write /config/usb_gadget/g1/UDC "none"
+    setprop sys.usb.ffs.ready 0
+    setprop sys.usb.ffs.mtp.ready 0
+    write /config/usb_gadget/g1/bDeviceClass 0
+    write /config/usb_gadget/g1/bDeviceSubClass 0
+    write /config/usb_gadget/g1/bDeviceProtocol 0
+    setprop sys.usb.state ${sys.usb.config}
+
+on property:init.svc.adbd=stopped
+    setprop sys.usb.ffs.ready 0

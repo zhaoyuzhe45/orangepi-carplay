@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.carplaybox.phoneprobe">
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="27" />
+    <application android:label="Phone UI tests" />
+    <instrumentation android:name="com.carplaybox.audio.PhoneUiDeviceTest" android:targetPackage="com.carplaybox.phone" />
+    <instrumentation android:name="com.carplaybox.audio.PhoneBridgeDeviceTest" android:targetPackage="com.carplaybox.phone" />
+    <instrumentation android:name="com.carplaybox.audio.PhoneServicesDeviceTest" android:targetPackage="com.carplaybox.audio" />
+    <instrumentation android:name="com.carplaybox.audio.PhonePairingDeviceTest" android:targetPackage="com.carplaybox.audio" />
+</manifest>

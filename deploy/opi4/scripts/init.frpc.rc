@@ -1,0 +1,17 @@
+# frp client — keeps the OPi4 reachable from outside the bench network so adb
+# works without a USB cable plugged into a PC.
+#
+# Separate from carplay_box.rc on purpose: the CarPlay supervisor must keep
+# working even if the tunnel binary is missing or its config is wrong, and
+# restarting one must not disturb the other.
+service carplay_frpc /system/bin/sh /data/carplay/bin/frpc_launcher.sh
+    class late_start
+    user root
+    group root system inet net_admin
+    # Same reasoning as carplay_box.rc: this userdebug vendor image has no
+    # custom init domain, and su is the supported root execution domain.
+    seclabel u:r:su:s0
+    disabled
+
+on property:sys.boot_completed=1
+    start carplay_frpc

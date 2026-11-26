@@ -1,0 +1,4 @@
+CARPLAY_BOX_VERSION=0.1.0-dev.20261022
+TARGET_PLATFORM=Orange Pi 4 LTS RK3399 Android 8.1 aarch64
+PACKAGE_API=21
+RELEASE_STATUS=testbench-validated; real-vehicle-and-authorized-certification-pending

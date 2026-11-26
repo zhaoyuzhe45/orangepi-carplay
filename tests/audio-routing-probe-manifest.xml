@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.carplaybox.audioroutingprobe">
+ <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="27" />
+ <application android:label="Audio routing verification" />
+ <instrumentation android:name="com.carplaybox.audio.AudioRoutingDeviceTest" android:targetPackage="com.carplaybox.audio" />
+</manifest>

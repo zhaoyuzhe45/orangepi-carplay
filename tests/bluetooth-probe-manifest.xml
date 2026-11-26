@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.carplaybox.bluetoothprobe">
+    <uses-sdk android:minSdkVersion="27" android:targetSdkVersion="27" />
+    <application android:label="CarPlay Bluetooth test only" />
+    <instrumentation android:name="com.carplaybox.audio.BluetoothBridgeDeviceTest" android:targetPackage="com.carplaybox.audio" />
+</manifest>

@@ -1,0 +1,97 @@
+# CarPlay accessory supervisory service.
+# Install as /system/etc/init/carplay_box.rc after placing the runtime files
+# below /data/carplay. The filesystem is deliberately initialized here so a
+# data wipe or first boot cannot leave a partially configured service.
+
+on post-fs-data
+    mkdir /data/carplay 0700 root root
+    mkdir /data/carplay/bin 0755 root root
+    mkdir /data/carplay/logs 0700 root root
+    restorecon_recursive /data/carplay
+
+service carplay_box /system/bin/sh /data/carplay/bin/carplay_supervisor.sh
+    class late_start
+    user root
+    group root system inet net_admin usb shell input log
+    # This userdebug vendor image has no custom init domain for accessory
+    # services. Its existing su domain is the supported root execution domain.
+    seclabel u:r:su:s0
+    disabled
+
+# Start the moment the stock USB init publishes sys.usb.configfs=1, not at
+# boot_completed. /init.usb.configfs.rc:21 fires on sys.usb.ffs.ready=1 while
+# sys.usb.configfs is still 1, and adbd reports ready ~7 s into boot: that
+# branch links ffs.adb into configuration 1 and binds the UDC, so the head
+# unit enumerates an Android ADB gadget first and settles on Android Auto /
+# CarLife. Waiting for boot_completed loses that race by ~35 s.
+on property:sys.usb.configfs=1
+    start carplay_box
+    # init.rk30board.usb.rc writes this to 1 from its own `on boot` block, and
+    # that write lands after this service has already started. Pin the gate
+    # here, where the ordering is init's problem: this action only runs after
+    # the stock write, so it always has the last word.
+    setprop sys.usb.configfs carplay
+
+# Winning that race with pure speed is not reliable: adbd can report
+# sys.usb.ffs.ready=1 before the supervisor has finished starting, and init
+# replays actions that were already queued even after the gate changes.
+# Flipping the config value removes the condition instead of racing it —
+# /init.usb.configfs.rc:21 requires sys.usb.config=adb, so it can never match
+# again. adbd is started by the stock rule for config=adb, which runs before
+# this one, and keeps serving the TCP transport. USB adb stays down while
+# CarPlay owns the gadget, which is the intended trade.
+on property:sys.usb.config=adb
+    start adbd
+    setprop sys.usb.configfs carplay
+    setprop sys.usb.config carplay
+
+# With sys.usb.config parked away from adb, the stock `on property:
+# sys.usb.config=adb` restart hook no longer fires. adbd is the only path to
+# this box once CarPlay owns the USB port, so restart it directly; losing it
+# means losing the TCP transport that remote debugging depends on.
+on property:init.svc.adbd=stopped
+    start adbd
+
+# Keep the late fallback: if the property was already 1 before this file was
+# parsed, or the first start failed, boot_completed still brings it up.
+on property:sys.boot_completed=1
+    start carplay_box
+
+# The measured RK3399 Android8 init graph imports /system rc files during fs,
+# mounts /cache there, then runs post-fs-data before zygote-start. Remove only
+# persisted WM geometry preferences before system_server can read them. Other
+# settings and all USB actions above are preserved.
+on post-fs-data
+    exec u:r:su:s0 root root system graphics -- /system/bin/sh /system/etc/carplay/apply_display_mode.sh early-settings
+
+# /init.rc queues load_persist_props_action before early-boot, and class_start
+# hal/core only in boot. This synchronous bounded-work helper therefore has the
+# final property values before HWC first reads them. It reads one trusted cache
+# record or falls back to800x480@60 density160; no wait, poll, or service restart.
+# early-init would already have fired when /system/etc/init is imported.
+on early-boot
+    setprop sys.carplay.display.active_density 160
+    setprop sys.carplay.display.active_mode 800x480@60
+    setprop persist.sys.framebuffer.main 800x480@60
+    setprop persist.sys.resolution.main Auto
+    setprop persist.sys.sf.lcd_density 160
+    setprop qemu.sf.lcd_density 160
+    exec u:r:su:s0 root root system graphics -- /system/bin/sh /system/etc/carplay/apply_display_mode.sh early
+
+# Keep the already selected cache/runtime target authoritative when readiness
+# first fires or preparation updates active_mode.
+on property:ro.persistent_properties.ready=true && property:sys.carplay.display.active_mode=*
+    setprop persist.sys.framebuffer.main ${sys.carplay.display.active_mode}
+    setprop persist.sys.resolution.main Auto
+    setprop persist.sys.sf.lcd_density ${sys.carplay.display.active_density}
+    setprop qemu.sf.lcd_density ${sys.carplay.display.active_density}
+
+# FDE loads /data properties again after unlock, when the read-only readiness
+# flag is already true and cannot trigger again. Root /init.rc is parsed before
+# this system rc, so its matching load_persist_props action runs before these
+# builtins. Reassert properties only; no helper, wait, or graphics restart.
+on property:vold.decrypt=trigger_load_persist_props && property:sys.carplay.display.active_mode=*
+    setprop persist.sys.framebuffer.main ${sys.carplay.display.active_mode}
+    setprop persist.sys.resolution.main Auto
+    setprop persist.sys.sf.lcd_density ${sys.carplay.display.active_density}
+    setprop qemu.sf.lcd_density ${sys.carplay.display.active_density}
